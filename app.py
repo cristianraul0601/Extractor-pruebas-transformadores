@@ -2,6 +2,7 @@ import streamlit as st
 from google import genai
 from google.genai import types
 import pandas as pd
+import io
 import json
 import time
 
@@ -127,7 +128,31 @@ if uploaded_file and api_key:
                 st.warning("No se encontraron tablas de pruebas en el documento.")
             else:
                 st.success(f"✓ ¡Se identificaron {len(lista_tablas)} tablas de pruebas!")
-                st.markdown("### Selecciona la prueba que deseas copiar:")
+
+                # Generador de archivo Excel (.xlsx) con una pestaña por prueba
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    for i, t in enumerate(lista_tablas):
+                        cols = t.get("columnas", [])
+                        filas = t.get("filas", [])
+                        df_sheet = pd.DataFrame(filas, columns=cols)
+                        
+                        raw_name = t.get("nombre_prueba", f"Prueba_{i+1}")
+                        sheet_name = "".join([c for c in raw_name if c not in r"[]:*?/\\]"])[:30]
+                        df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                excel_bytes = output.getvalue()
+
+                st.download_button(
+                    label="📥 Descargar Protocolo Completo en Excel (.xlsx)",
+                    data=excel_bytes,
+                    file_name="Protocolo_Pruebas_Consolidado.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+
+                st.markdown("---")
+                st.markdown("### O copia individualmente la prueba que necesites:")
 
                 titulos_tabs = [f"📋 {t.get('nombre_prueba', f'Prueba {i+1}')}" for i, t in enumerate(lista_tablas)]
                 tabs = st.tabs(titulos_tabs)
