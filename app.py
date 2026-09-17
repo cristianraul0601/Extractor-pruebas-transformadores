@@ -25,12 +25,12 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia (Megger TRAX, OMICRON CPC 100 / TESTRANO, Doble, Vanguard).
     Analiza este documento completo y extrae de forma INDEPENDIENTE todas las tablas de pruebas presentes que correspondan a:
     
-    1. Relación de Transformación (TTR) y Polaridad (Consolidación Trifásica Universal):
-       - Cada fila de la tabla final DEBE representar exactamente un Tap con las tres fases en la misma fila horizontal.
-       - Si el reporte presenta las fases en columnas directas (formato OMICRON / Doble), consérvalas así.
-       - Si el reporte desglosa las fases U-O, V-O y W-O en filas o páginas separadas (formato Megger TRAX), reúne y alinea los datos de cada fase bajo su número de Tap correspondiente.
-       - Columnas: ["Tap", "Tensión AT (V)", "Relación Teórica", "Rel. Medida U", "Error U", "Rel. Medida V", "Error V", "Rel. Medida W", "Error W"].
-       - Elimina cualquier símbolo de '%'.
+    1. Relación de Transformación (TTR) y Polaridad:
+       - EXTRAE TODAS LAS PRUEBAS DE TTR PRESENTES: Si el reporte contiene mediciones entre diferentes devanados (por ejemplo, AT vs MT y AT vs BT/Terciario), genera una tabla independiente para cada una.
+       - Asigna títulos diferenciados: ej. "1a. TTR - AT vs MT" y "1b. TTR - AT vs BT".
+       - CONSOLIDACIÓN TRIFÁSICA OBLIGATORIA: Cada fila debe ser un Tap con las columnas: ["Tap", "Tensión AT (V)", "Relación Teórica", "Rel. Medida U", "Error U", "Rel. Medida V", "Error V", "Rel. Medida W", "Error W"].
+       - En las pruebas completas (como AT-BT en páginas 11 a 13 del TRAX), extrae minuciosamente todos los Taps del 1 al 27 sin omitir ninguno.
+       - Elimina el símbolo '%'.
        
     2. Corriente de Excitación en Alta Tensión (Universal para TRAX, OMICRON, Doble):
        - REGLA DE SELECCIÓN: Extrae ÚNICAMENTE la prueba real de excitación realizada a alta tensión nominal de ensayo (~10 kV o 10000 V).
@@ -42,7 +42,8 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
        - Ordena siempre las filas en orden ascendente por Tap (Tap 1, 2, ...).
 
     3. Resistencia de Devanados en CC:
-       - Mediciones de AT por cada Tap medido (U-O, V-O, W-O o entre fases) y devanados de MT/BT.
+       - Extrae tanto el devanado de Alta Tensión (AT por Taps) como los devanados de Media Tensión (MT) y Baja Tensión / Terciario (BT) presentes en el documento.
+       - Si vienen en secciones separadas, consolídalas en una sola tabla o en tablas contiguas: ["Devanado / Conexión", "Tap", "Corriente (A)", "R Medida (Ω)", "Desviación (%)"].
        - CONVERSIÓN: Divide los mΩ entre 1000 para reportar en Ohmios (Ω).
 
     4. Resistencia de Aislamiento:
