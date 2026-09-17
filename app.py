@@ -21,6 +21,7 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     client = genai.Client(api_key=api_key)
     
     prompt = """
+    prompt = """
     Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia.
     Analiza este documento completo y extrae de forma INDEPENDIENTE todas las tablas de pruebas presentes que correspondan a:
     
@@ -28,43 +29,42 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     2. Corriente de Excitación (Iu, Iv, Iw en cada Tap).
     3. Resistencia de Devanados en CC (AT por Taps y MT, fases, resistencia medida y desbalances).
     4. Resistencia de Aislamiento, Índice de Polarización (IP) e Índice de Absorción (IA).
-    5. Factor de Potencia / Tangente Delta y Capacitancia (Devanados y Bushings).
+    5. Factor de Potencia y Capacitancia de Devanados (IMPORTANTE):
+       - Extrae obligatoriamente dos tablas independientes:
+         a) "5a. Factor de Potencia y Capacitancia de Devanados (Antes de pruebas dieléctricas)"
+         b) "5b. Factor de Potencia y Capacitancia de Devanados (Después de pruebas dieléctricas)"
+       - CONDICIÓN CRÍTICA DE TENSIÓN: Extrae y prioriza los registros evaluados a tensión nominal de prueba de 10 kV (10000 V / 10 kV). Si el reporte incluye barridos a 2 kV y a 10 kV, conserva o resalta los datos correspondientes al escalón de 10 kV.
+       - Incluye: Aislamiento medido (CH, CL, CT, CHL, CHT, CLT), Modo (UST/GST), Tensión (kV/V), FP medido, FP corregido a 20°C (%), Capacitancia (pF) y si existe, la diferencia/variación (% ΔFP).
+    6. Factor de Potencia y Capacitancia de Bushings C1 y C2 (Antes y Después a 10 kV).
     
-    Reglas obligatorias de negocio:
-    - CONVERSIÓN DE CORRIENTE: Si está en miliamperios (mA), divide entre 1000 para reportar en Amperios (A).
-    - CONVERSIÓN DE RESISTENCIA: Si la resistencia de devanados está en miliohmios (mΩ), divide entre 1000 para reportar en Ohmios (Ω).
-    - ORDEN DE TAPS: Siempre ordena de menor a mayor (Tap 1, 2, 3... hacia arriba).
-    - NÚMEROS LIMPIOS: Quita el símbolo '%' de los porcentajes de error o desbalance.
-    - Asigna un nombre claro y técnico a cada prueba en 'nombre_prueba'.
-    
+    Reglas obligatorias de formato:
+    - CONVERSIÓN DE CORRIENTE: Si está en mA, divide entre 1000 para reportar en Amperios (A).
+    - CONVERSIÓN DE RESISTENCIA: Si está en mΩ, divide entre 1000 para reportar en Ohmios (Ω).
+    - ORDEN DE TAPS: Ordena siempre en orden ascendente (Tap 1, 2, 3...).
+    - NÚMEROS LIMPIOS: Quita el símbolo '%' de los porcentajes de error, factor de potencia o desbalances para que en Excel sean números puros.
+    - Asigna nombres claros que diferencien 'Antes' y 'Después de dieléctricas' en 'nombre_prueba'.
+
     Estructura JSON requerida:
     {
       "tablas": [
         {
-          "nombre_prueba": "1. Relación de Transformación (TTR)",
-          "columnas": ["Tap", "Tensión AT (kV)", "Tensión MT (kV)", "Relación Teórica", "Relación U-O", "Error U", "Relación V-O", "Error V", "Relación W-O", "Error W"],
+          "nombre_prueba": "5a. Factor de Potencia y Capacitancia - Devanados (Antes - 10 kV)",
+          "columnas": ["Aislamiento", "Modo", "Tensión (kV)", "FP Medido", "FP Corr. 20°C", "Capacitancia (pF)", "Evaluación"],
           "filas": [
-             [1, 127.017, 36.061, 3.522, 3.516, -0.19, 3.517, -0.16, 3.515, -0.21]
+             ["CH", "GSTg-A+B", 10.0, 0.221, 0.197, 2440.8, "CORRECTO"],
+             ["CHL", "UST-A", 10.0, 0.165, 0.147, 2983.0, "CORRECTO"]
           ]
         },
         {
-          "nombre_prueba": "2. Corriente de Excitación",
-          "columnas": ["Tap", "I Fase U (A)", "I Fase V (A)", "I Fase W (A)"],
+          "nombre_prueba": "5b. Factor de Potencia y Capacitancia - Devanados (Después - 10 kV)",
+          "columnas": ["Aislamiento", "Modo", "Tensión (kV)", "FP Medido", "FP Corr. 20°C", "Capacitancia (pF)", "Variación ΔFP", "Evaluación"],
           "filas": [
-             [1, 0.00223, 0.00219, 0.00221]
-          ]
-        },
-        {
-          "nombre_prueba": "3. Resistencia de Devanados (AT y MT)",
-          "columnas": ["Tap / Fase", "R Medida (Ω)", "R Corregida 75°C (Ω)", "Desbalance"],
-          "filas": [
-             ["Tap 1 - U-V", 0.0452, 0.0541, 0.35]
+             ["CH", "GSTg-A+B", 10.0, 0.224, 0.201, 2442.1, 0.02, "CORRECTO"]
           ]
         }
       ]
     }
     """
-    
     modelos_a_probar = ['gemini-3.5-flash-lite', 'gemini-3.5-flash']
     last_error = None
 
