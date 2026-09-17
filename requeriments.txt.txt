@@ -1,0 +1,6 @@
+streamlit
+google-genai
+openpyxl
+pandas
+streamlit-paste-button
+pillow
