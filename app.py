@@ -21,7 +21,6 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     client = genai.Client(api_key=api_key)
     
     prompt = """
-    prompt = """
     Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia.
     Analiza este documento completo y extrae de forma INDEPENDIENTE todas las tablas de pruebas presentes que correspondan a:
     
