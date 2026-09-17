@@ -1,7 +1,6 @@
 import streamlit as st
 from google import genai
 from google.genai import types
-from streamlit_paste_button import paste_image_button as pbutton
 import pandas as pd
 import json
 import io
@@ -12,19 +11,10 @@ st.title("⚡ Copiador Rápido de Pruebas a Excel")
 
 api_key = st.sidebar.text_input("Ingresa tu Gemini API Key:", type="password")
 
-st.markdown("### 1. Pega tu captura de pantalla")
-st.caption("Usa `Win + Shift + S` para recortar la tabla de tu prueba, luego presiona el botón:")
-
-paste_result = pbutton(
-    "📋 Pegar captura del portapapeles", 
-    text_color="#FFFFFF", 
-    background_color="#2F5597",
-    hover_background_color="#1F3864"
-)
-
+st.markdown("### Sube la captura de tu tabla o archivo")
 uploaded_files = st.file_uploader(
-    "O sube archivos si prefieres (PDF, JPG, PNG)", 
-    type=["pdf", "jpg", "jpeg", "png"], 
+    "Selecciona una o varias capturas/archivos (PNG, JPG, PDF):", 
+    type=["png", "jpg", "jpeg", "pdf"], 
     accept_multiple_files=False
 )
 
@@ -51,7 +41,7 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     }
     """
     
-    modelos_a_probar = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.6-flash']
+    modelos_a_probar = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
     last_error = None
 
     for model_name in modelos_a_probar:
@@ -75,24 +65,15 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     raise last_error
 
 # Procesamiento
-img_data = None
-mime = "image/png"
-
-if paste_result.image_data is not None:
-    img_bytes = io.BytesIO()
-    paste_result.image_data.save(img_bytes, format='PNG')
-    img_data = img_bytes.getvalue()
-    mime = "image/png"
-elif uploaded_files:
-    img_data = uploaded_files.getvalue()
-    mime = "application/pdf" if uploaded_files.name.lower().endswith(".pdf") else "image/jpeg"
-
-if img_data and api_key:
+if uploaded_files and api_key:
+    mime = "application/pdf" if uploaded_files.name.lower().endswith(".pdf") else "image/png"
+    if uploaded_files.name.lower().endswith((".jpg", ".jpeg")):
+        mime = "image/jpeg"
+        
     with st.spinner("⚡ Extrayendo y convirtiendo datos..."):
         try:
-            datos = procesar_con_ia(img_data, mime, api_key)
+            datos = procesar_con_ia(uploaded_files.getvalue(), mime, api_key)
             
-            # Normalizar si vino como lista o dict
             if isinstance(datos, list) and len(datos) > 0:
                 datos = datos[0]
             elif isinstance(datos, dict) and "tablas" in datos:
@@ -103,18 +84,15 @@ if img_data and api_key:
             df = pd.DataFrame(filas, columns=cols)
 
             st.success("✓ ¡Datos listos!")
-            st.markdown("### 2. Copia tus datos:")
+            st.markdown("### Copia tus datos:")
 
-            # Opción 1: Texto listo para copiar al portapapeles
             texto_excel = df.to_csv(sep="\t", index=False)
             st.code(texto_excel, language="text")
-            st.caption("👆 Puedes presionar el ícono de **Copiar** arriba a la derecha del recuadro gris y hacer `Ctrl + V` en tu Excel compartido.")
+            st.caption("👆 Presiona el ícono de **Copiar** arriba a la derecha y pega directo en tu Excel compartido.")
 
-            # Opción 2: Tabla interactiva para copiar celdas específicas
-            st.markdown("#### Vista en tabla:")
             st.dataframe(df, use_container_width=True)
 
         except Exception as e:
-            st.error(f"Error procesando la imagen: {e}")
+            st.error(f"Error procesando el archivo: {e}")
 elif not api_key:
     st.info("💡 Pega tu API Key de Gemini en la barra lateral para empezar.")
