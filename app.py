@@ -9,10 +9,6 @@ import time
 st.set_page_config(page_title="Extractor de Protocolos FAT - Transformadores", layout="wide")
 st.title("⚡ Extractor de Protocolos de Transformadores a Excel")
 
-# Reemplaza esto:
-api_key = st.sidebar.text_input("Ingresa tu Gemini API Key:", type="password")
-
-# Por esto:
 api_key = st.secrets.get("GEMINI_API_KEY") or st.sidebar.text_input("Ingresa tu Gemini API Key:", type="password")
 
 st.markdown("### Sube tu protocolo de pruebas (PDF o Imagen)")
