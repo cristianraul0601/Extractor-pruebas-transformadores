@@ -21,44 +21,53 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     client = genai.Client(api_key=api_key)
     
     prompt = """
-    Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia.
+    Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia (Megger TRAX, OMICRON CPC 100 / TESTRANO, Doble, Vanguard).
     Analiza este documento completo y extrae de forma INDEPENDIENTE todas las tablas de pruebas presentes que correspondan a:
     
-    1. Relación de Transformación (TTR) y Polaridad (Taps 1 al 27 o según corresponda, fases U, V, W, relación teórica, medida y error).
-    2. Corriente de Excitación (Iu, Iv, Iw en cada Tap).
-    3. Resistencia de Devanados en CC (AT por Taps y MT, fases, resistencia medida y desbalances).
-    4. Resistencia de Aislamiento, Índice de Polarización (IP) e Índice de Absorción (IA).
-    5. Factor de Potencia y Capacitancia de Devanados (IMPORTANTE):
-       - Extrae obligatoriamente dos tablas independientes:
+    1. Relación de Transformación (TTR) y Polaridad:
+       - Extrae Taps (orden ascendente), voltajes teóricos, relación medida y error porcentual por fase.
+       
+    2. Corriente de Excitación en Alta Tensión (Regla Universal para TRAX, OMICRON, Doble):
+       - REGLA CRÍTICA DE SELECCIÓN: Extrae ÚNICAMENTE la prueba real de excitación realizada a alta tensión nominal de ensayo (~10 kV o 10000 V).
+       - En formatos TRAX: Esta prueba aparece habitualmente bajo el encabezado 'Tangente delta - Prueba Manual' con notas/comentarios como 'MEDICION DE CORRIENTE DE EXCITACION AT' y comentarios de fase por Tap ('U-N TAP-1', 'V-N TAP-14', etc.).
+       - En formatos OMICRON/Doble: Se titula 'Excitation Current', 'Corriente de Excitación' o similar a 10 kV.
+       - REGLA DE EXCLUSIÓN: NUNCA tomes la columna secundaria 'I Exc' presente en las tablas de TTR (relación de transformación), ya que esa prueba se inyecta a baja tensión (50 V - 80 V) y produce corrientes auxiliares diminutas (~1 a 3 mA).
+       - Consolida una sola tabla por cada Tap con columnas: ["Tap", "Tensión (kV)", "Fase U (A)", "Fase V (A)", "Fase W (A)", "Potencia P (W)"].
+       - Si las fases vienen en filas separadas o en orden inverso (ej. Tap 27 al 1), consolídalas y ordénalas ascendentemente por Tap (Tap 1, 2, ...).
+       - CONVERSIÓN: Divide los mA entre 1000 para reportar en Amperios (A).
+
+    3. Resistencia de Devanados en CC:
+       - Mediciones de AT por cada Tap medido (U-O, V-O, W-O o entre fases) y devanados de MT/BT.
+       - CONVERSIÓN: Divide los mΩ entre 1000 para reportar en Ohmios (Ω).
+
+    4. Resistencia de Aislamiento:
+       - Valores de resistencia (MΩ/GΩ), corrientes de fuga (nA), índices IP e IA, y aislamiento de Núcleo-Armadura/Masa si están presentes.
+
+    5. Factor de Potencia y Capacitancia de Devanados (10 kV):
+       - Extrae obligatoriamente dos tablas independientes si ambas existen en el documento:
          a) "5a. Factor de Potencia y Capacitancia de Devanados (Antes de pruebas dieléctricas)"
          b) "5b. Factor de Potencia y Capacitancia de Devanados (Después de pruebas dieléctricas)"
-       - CONDICIÓN CRÍTICA DE TENSIÓN: Extrae y prioriza los registros evaluados a tensión nominal de prueba de 10 kV (10000 V / 10 kV). Si el reporte incluye barridos a 2 kV y a 10 kV, conserva o resalta los datos correspondientes al escalón de 10 kV.
-       - Incluye: Aislamiento medido (CH, CL, CT, CHL, CHT, CLT), Modo (UST/GST), Tensión (kV/V), FP medido, FP corregido a 20°C (%), Capacitancia (pF) y si existe, la diferencia/variación (% ΔFP).
-    6. Factor de Potencia y Capacitancia de Bushings C1 y C2 (Antes y Después a 10 kV).
-    
+       - CONDICIÓN DE TENSIÓN: Extrae los registros evaluados a tensión nominal de 10 kV (10000 V / 10 kV). Si el reporte incluye barridos a 2 kV y 10 kV, prioriza el escalón de 10 kV.
+       - Incluye: Aislamiento (CH, CL, CT, CHL, CHT, CLT), Modo (UST/GST), Tensión (kV), %FP corregido a 20°C y Capacitancia (pF).
+
+    6. Factor de Potencia y Capacitancia de Bushings C1 y C2 (Antes y Después a 10 kV):
+       - Mediciones de bornes a 10 kV si están presentes.
+
     Reglas obligatorias de formato:
-    - CONVERSIÓN DE CORRIENTE: Si está en mA, divide entre 1000 para reportar en Amperios (A).
-    - CONVERSIÓN DE RESISTENCIA: Si está en mΩ, divide entre 1000 para reportar en Ohmios (Ω).
-    - ORDEN DE TAPS: Ordena siempre en orden ascendente (Tap 1, 2, 3...).
-    - NÚMEROS LIMPIOS: Quita el símbolo '%' de los porcentajes de error, factor de potencia o desbalances para que en Excel sean números puros.
-    - Asigna nombres claros que diferencien 'Antes' y 'Después de dieléctricas' en 'nombre_prueba'.
+    - CONVERSIONES: Corrientes en Amperios (A), Resistencias de devanados en Ohmios (Ω).
+    - ORDEN: Todos los Taps ordenados de menor a mayor.
+    - NÚMEROS LIMPIOS: Quita el símbolo '%' de cualquier porcentaje (errores, FP, desbalances) para que en Excel sean números operables.
+    - Asigna nombres técnicos claros en 'nombre_prueba'.
 
     Estructura JSON requerida:
     {
       "tablas": [
         {
-          "nombre_prueba": "5a. Factor de Potencia y Capacitancia - Devanados (Antes - 10 kV)",
-          "columnas": ["Aislamiento", "Modo", "Tensión (kV)", "FP Medido", "FP Corr. 20°C", "Capacitancia (pF)", "Evaluación"],
+          "nombre_prueba": "2. Corriente de Excitación - AT (10 kV)",
+          "columnas": ["Tap", "Tensión (kV)", "Fase U-N (A)", "Fase V-N (A)", "Fase W-N (A)", "Potencia P (W)"],
           "filas": [
-             ["CH", "GSTg-A+B", 10.0, 0.221, 0.197, 2440.8, "CORRECTO"],
-             ["CHL", "UST-A", 10.0, 0.165, 0.147, 2983.0, "CORRECTO"]
-          ]
-        },
-        {
-          "nombre_prueba": "5b. Factor de Potencia y Capacitancia - Devanados (Después - 10 kV)",
-          "columnas": ["Aislamiento", "Modo", "Tensión (kV)", "FP Medido", "FP Corr. 20°C", "Capacitancia (pF)", "Variación ΔFP", "Evaluación"],
-          "filas": [
-             ["CH", "GSTg-A+B", 10.0, 0.224, 0.201, 2442.1, 0.02, "CORRECTO"]
+             [1, 10.0, 0.05850, 0.04155, 0.05904, 449.8],
+             [14, 10.0, 0.07412, 0.05355, 0.07436, 562.8]
           ]
         }
       ]
@@ -108,7 +117,6 @@ if uploaded_file and api_key:
                 st.success(f"✓ ¡Se identificaron {len(lista_tablas)} tablas de pruebas!")
                 st.markdown("### Selecciona la prueba que deseas copiar:")
 
-                # Crear una pestaña por cada prueba encontrada en el protocolo
                 titulos_tabs = [f"📋 {t.get('nombre_prueba', f'Prueba {i+1}')}" for i, t in enumerate(lista_tablas)]
                 tabs = st.tabs(titulos_tabs)
 
@@ -121,7 +129,6 @@ if uploaded_file and api_key:
 
                         st.subheader(t.get("nombre_prueba", f"Prueba {idx+1}"))
                         
-                        # Cuadro de copiado directo listo para Excel
                         tsv_data = df.to_csv(sep="\t", index=False)
                         st.code(tsv_data, language="text")
                         st.caption("👆 Haz clic en el icono de **Copiar** arriba a la derecha de este recuadro y presiona `Ctrl + V` en tu Excel compartido.")
