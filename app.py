@@ -25,8 +25,12 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     Eres un ingeniero especialista en ensayos y protocolos FAT de transformadores de potencia (Megger TRAX, OMICRON CPC 100 / TESTRANO, Doble, Vanguard).
     Analiza este documento completo y extrae de forma INDEPENDIENTE todas las tablas de pruebas presentes que correspondan a:
     
-    1. Relación de Transformación (TTR) y Polaridad:
-       - Extrae Taps (orden ascendente), voltajes teóricos, relación medida y error porcentual por fase.
+    1. Relación de Transformación (TTR) y Polaridad (Consolidación Trifásica Universal):
+       - Cada fila de la tabla final DEBE representar exactamente un Tap con las tres fases en la misma fila horizontal.
+       - Si el reporte presenta las fases en columnas directas (formato OMICRON / Doble), consérvalas así.
+       - Si el reporte desglosa las fases U-O, V-O y W-O en filas o páginas separadas (formato Megger TRAX), reúne y alinea los datos de cada fase bajo su número de Tap correspondiente.
+       - Columnas: ["Tap", "Tensión AT (V)", "Relación Teórica", "Rel. Medida U", "Error U", "Rel. Medida V", "Error V", "Rel. Medida W", "Error W"].
+       - Elimina cualquier símbolo de '%'.
        
     2. Corriente de Excitación en Alta Tensión (Universal para TRAX, OMICRON, Doble):
        - REGLA DE SELECCIÓN: Extrae ÚNICAMENTE la prueba real de excitación realizada a alta tensión nominal de ensayo (~10 kV o 10000 V).
