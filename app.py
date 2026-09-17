@@ -27,14 +27,14 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     1. Relación de Transformación (TTR) y Polaridad:
        - Extrae Taps (orden ascendente), voltajes teóricos, relación medida y error porcentual por fase.
        
-    2. Corriente de Excitación en Alta Tensión (Regla Universal para TRAX, OMICRON, Doble):
-       - REGLA CRÍTICA DE SELECCIÓN: Extrae ÚNICAMENTE la prueba real de excitación realizada a alta tensión nominal de ensayo (~10 kV o 10000 V).
-       - En formatos TRAX: Esta prueba aparece habitualmente bajo el encabezado 'Tangente delta - Prueba Manual' con notas/comentarios como 'MEDICION DE CORRIENTE DE EXCITACION AT' y comentarios de fase por Tap ('U-N TAP-1', 'V-N TAP-14', etc.).
-       - En formatos OMICRON/Doble: Se titula 'Excitation Current', 'Corriente de Excitación' o similar a 10 kV.
-       - REGLA DE EXCLUSIÓN: NUNCA tomes la columna secundaria 'I Exc' presente en las tablas de TTR (relación de transformación), ya que esa prueba se inyecta a baja tensión (50 V - 80 V) y produce corrientes auxiliares diminutas (~1 a 3 mA).
-       - Consolida una sola tabla por cada Tap con columnas: ["Tap", "Tensión (kV)", "Fase U (A)", "Fase V (A)", "Fase W (A)", "Potencia P (W)"].
-       - Si las fases vienen en filas separadas o en orden inverso (ej. Tap 27 al 1), consolídalas y ordénalas ascendentemente por Tap (Tap 1, 2, ...).
-       - CONVERSIÓN: Divide los mA entre 1000 para reportar en Amperios (A).
+    2. Corriente de Excitación en Alta Tensión (Universal para TRAX, OMICRON, Doble):
+       - REGLA DE SELECCIÓN: Extrae ÚNICAMENTE la prueba real de excitación realizada a alta tensión nominal de ensayo (~10 kV o 10000 V).
+       - En TRAX: Viene como 'Tangente delta - Prueba Manual' con notas 'MEDICION DE CORRIENTE DE EXCITACION AT' y comentarios de fase por Tap ('U-N TAP-1', 'V-N TAP-27', etc.).
+       - REGLA CRÍTICA DE FASES INVERSAS: Observa minuciosamente todas las filas de la prueba. Algunas fases (frecuentemente V-N) se ensayan en orden descendente, por lo que el registro de TAP-27 puede aparecer al inicio de la fase (ej: 'V-N TAP-27' con ~70 mA). NO dejes celdas vacías ni 'None'; empareja cada Tap con su valor correspondiente.
+       - REGLA DE EXCLUSIÓN: NUNCA tomes la columna 'I Exc' de las tablas de TTR (esa es a 50-80 V con valores de ~1-3 mA).
+       - Consolida una sola tabla por cada Tap con columnas: ["Tap", "Tensión (kV)", "Fase U-N (A)", "Fase V-N (A)", "Fase W-N (A)", "Potencia P (W)"].
+       - CONVERSIÓN: Convierte estrictamente los mA a Amperios (A) dividiendo entre 1000.
+       - Ordena siempre las filas en orden ascendente por Tap (Tap 1, 2, ...).
 
     3. Resistencia de Devanados en CC:
        - Mediciones de AT por cada Tap medido (U-O, V-O, W-O o entre fases) y devanados de MT/BT.
@@ -44,17 +44,21 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
        - Valores de resistencia (MΩ/GΩ), corrientes de fuga (nA), índices IP e IA, y aislamiento de Núcleo-Armadura/Masa si están presentes.
 
     5. Factor de Potencia y Capacitancia de Devanados (10 kV):
-       - Extrae obligatoriamente dos tablas independientes si ambas existen en el documento:
+       - Extrae tablas independientes si existen ambas:
          a) "5a. Factor de Potencia y Capacitancia de Devanados (Antes de pruebas dieléctricas)"
          b) "5b. Factor de Potencia y Capacitancia de Devanados (Después de pruebas dieléctricas)"
-       - CONDICIÓN DE TENSIÓN: Extrae los registros evaluados a tensión nominal de 10 kV (10000 V / 10 kV). Si el reporte incluye barridos a 2 kV y 10 kV, prioriza el escalón de 10 kV.
-       - Incluye: Aislamiento (CH, CL, CT, CHL, CHT, CLT), Modo (UST/GST), Tensión (kV), %FP corregido a 20°C y Capacitancia (pF).
+       - CONDICIÓN DE TENSIÓN: Extrae los registros evaluados a tensión nominal de 10 kV (10000 V / 10 kV).
+       - REGLA CRÍTICA DE CONVERSIÓN DE CAPACITANCIA:
+         * La capacitancia debe reportarse siempre en picofaradios (pF).
+         * Si el reporte expresa la capacitancia en nanofaradios (nF), MULTIPLICA POR 1000 (ejemplo: 22.20 nF -> 22200 pF; 19.47 nF -> 19470 pF; 2.739 nF -> 2739 pF).
+         * Si ya está en pF (o P@F), mantén el valor numérico directo.
+       - Columnas requeridas: ["Conexión / Aislamiento", "Modo", "Tensión (kV)", "I (mA)", "Capacitancia (pF)", "%FP@20°C"].
 
     6. Factor de Potencia y Capacitancia de Bushings C1 y C2 (Antes y Después a 10 kV):
-       - Mediciones de bornes a 10 kV si están presentes.
+       - Mediciones de bornes a 10 kV si están presentes, con capacitancia en pF.
 
     Reglas obligatorias de formato:
-    - CONVERSIONES: Corrientes en Amperios (A), Resistencias de devanados en Ohmios (Ω).
+    - CONVERSIONES: Corrientes de excitación en Amperios (A), Resistencias de devanados en Ohmios (Ω), Capacitancias en picofaradios (pF).
     - ORDEN: Todos los Taps ordenados de menor a mayor.
     - NÚMEROS LIMPIOS: Quita el símbolo '%' de cualquier porcentaje (errores, FP, desbalances) para que en Excel sean números operables.
     - Asigna nombres técnicos claros en 'nombre_prueba'.
@@ -67,7 +71,15 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
           "columnas": ["Tap", "Tensión (kV)", "Fase U-N (A)", "Fase V-N (A)", "Fase W-N (A)", "Potencia P (W)"],
           "filas": [
              [1, 10.0, 0.05850, 0.04155, 0.05904, 449.8],
-             [14, 10.0, 0.07412, 0.05355, 0.07436, 562.8]
+             [27, 10.0, 0.09595, 0.07004, 0.09627, 726.2]
+          ]
+        },
+        {
+          "nombre_prueba": "5a. Factor de Potencia y Capacitancia de Devanados (Antes - 10 kV)",
+          "columnas": ["Conexión / Aislamiento", "Modo", "Tensión (kV)", "I (mA)", "Capacitancia (pF)", "%FP@20°C"],
+          "filas": [
+             ["CHG + CHL", "GSTg-B", 10.01, 83.71, 22200.0, 0.209],
+             ["CHL", "UST-R", 10.01, 73.38, 19470.0, 0.206]
           ]
         }
       ]
