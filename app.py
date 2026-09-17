@@ -41,7 +41,7 @@ def procesar_con_ia(file_bytes, mime_type, api_key):
     }
     """
     
-    modelos_a_probar = ['gemini-2.5-flash', 'gemini-2.5-flash-lite']
+    modelos_a_probar = ['gemini-3.5-flash', 'gemini-3.5-flash-lite']
     last_error = None
 
     for model_name in modelos_a_probar:
